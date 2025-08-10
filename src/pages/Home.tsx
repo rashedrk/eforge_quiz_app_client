@@ -9,8 +9,16 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle, Clock, Award, Shield } from "lucide-react";
+import { useAppSelector } from "@/redux/hooks";
+import {
+  selectCurrentUser,
+  useCurrentToken,
+} from "@/redux/features/auth/authSlice";
 
 const HomePage = () => {
+  const currentUser = useAppSelector(selectCurrentUser);
+  const accessToken = useAppSelector(useCurrentToken);
+  const isAuthenticated = Boolean(currentUser) || Boolean(accessToken);
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -21,10 +29,12 @@ const HomePage = () => {
             <h1 className="text-2xl font-bold text-gray-900">EForge Quiz</h1>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <Link to="/login">
-              <Button variant="outline">Login</Button>
-            </Link>
-            <Link to="/register">
+            {!isAuthenticated && (
+              <Link to="/login">
+                <Button variant="outline">Login</Button>
+              </Link>
+            )}
+            <Link to="/assessment?step=1">
               <Button>Get Started</Button>
             </Link>
           </div>
@@ -43,7 +53,7 @@ const HomePage = () => {
             your digital competency certification today.
           </p>
           <div className="flex justify-center flex-wrap gap-4">
-            <Link to="/register">
+            <Link to="/assessment?step=1">
               <Button size="lg" className="px-8">
                 Start Assessment
               </Button>
