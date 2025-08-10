@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,10 @@ import {
   Download,
   Home,
 } from "lucide-react";
+import { jsPDF } from "jspdf";
+import dayjs from "dayjs";
+import { useAppSelector } from "@/redux/hooks";
+import { selectCurrentUser } from "@/redux/features/auth/authSlice";
 
 const AssessmentResultsPage = () => {
   const navigate = useNavigate();
@@ -20,16 +24,8 @@ const AssessmentResultsPage = () => {
   const score = Number.parseFloat(params.get("score") || "0");
   const level = params.get("level") || "";
   const canProceed = params.get("canProceed") === "true";
-
-  const [showConfetti, setShowConfetti] = useState(false);
-
-  useEffect(() => {
-    if (score >= 25) {
-      setShowConfetti(true);
-      const t = setTimeout(() => setShowConfetti(false), 3000);
-      return () => clearTimeout(t);
-    }
-  }, [score]);
+  const showProceed = canProceed && step < 3;
+  const user = useAppSelector(selectCurrentUser);
 
   const result = useMemo(() => {
     if (score < 25) {
@@ -41,7 +37,7 @@ const AssessmentResultsPage = () => {
         icon: <XCircle className="h-12 w-12 text-red-500" />,
       };
     }
-    if (score >= 75 && canProceed) {
+    if (score >= 75 && showProceed) {
       return {
         title: "Excellent Performance!",
         message: `Congratulations! You've achieved ${level} certification and can proceed to the next step.`,
@@ -55,7 +51,7 @@ const AssessmentResultsPage = () => {
       color: "text-blue-600",
       icon: <Award className="h-12 w-12 text-blue-500" />,
     };
-  }, [score, canProceed, level]);
+  }, [score, showProceed, level]);
 
   const isFailed = score < 25 || level === "Failed" || level === "Fail";
 
@@ -69,12 +65,58 @@ const AssessmentResultsPage = () => {
   // Reserved for potential future use
 
   const handleNextStep = () => {
+    if (step >= 3) return;
     const nextStep = step + 1;
     navigate(`/assessment?step=${nextStep}`);
   };
 
   const handleDownloadCertificate = () => {
-    navigate("/certificate");
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "pt",
+      format: "a4",
+    });
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    const centerX = pageWidth / 2;
+    const userName = user?.name || user?.email || "User";
+    const issuedDate = dayjs().format("YYYY-MM-DD");
+
+    // Frame
+    pdf.setDrawColor(37, 99, 235);
+    pdf.setLineWidth(2);
+    pdf.rect(24, 24, pageWidth - 48, pageHeight - 48);
+
+    // Title
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(28);
+    pdf.text("Certificate of Achievement", centerX, 120, { align: "center" });
+
+    // Subtitle
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(14);
+    pdf.text("This is to certify that", centerX, 160, { align: "center" });
+
+    // Name
+    pdf.setFont("helvetica", "bold");
+    pdf.setFontSize(22);
+    pdf.text(userName, centerX, 195, { align: "center" });
+
+    // Body
+    pdf.setFont("helvetica", "normal");
+    pdf.setFontSize(14);
+    const body = `has achieved Level ${level} with a score of ${Math.round(
+      score
+    )}% in Step ${step} Assessment.`;
+    pdf.text(body, centerX, 230, { align: "center" });
+
+    // Details
+    pdf.setFontSize(12);
+    pdf.text(`Issued on: ${issuedDate}`, centerX, 270, { align: "center" });
+    pdf.setFont("helvetica", "bold");
+    pdf.text("E-Forge Certification", centerX, 300, { align: "center" });
+
+    pdf.save(`certificate_${level}_${issuedDate}.pdf`);
   };
 
   const handleBackToDashboard = () => {
@@ -83,24 +125,6 @@ const AssessmentResultsPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      {showConfetti && (
-        <div className="fixed inset-0 pointer-events-none z-50">
-          <div className="absolute top-0 left-1/2 -translate-x-1/2">
-            {[...Array(20)].map((_, i) => (
-              <div
-                key={i}
-                className="absolute w-2 h-2 bg-yellow-400 rounded-full animate-bounce"
-                style={{
-                  left: `${Math.random() * 100}px`,
-                  animationDelay: `${Math.random() * 2}s`,
-                  animationDuration: `${2 + Math.random() * 2}s`,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-      )}
-
       <Card className="w-full max-w-2xl">
         <CardHeader className="text-center pb-2">
           <div className="flex justify-center mb-4">{result.icon}</div>
@@ -148,7 +172,7 @@ const AssessmentResultsPage = () => {
           )}
 
           <div className="space-y-3">
-            {canProceed && (
+            {showProceed && (
               <Button onClick={handleNextStep} className="w-full" size="lg">
                 <ArrowRight className="h-5 w-5 mr-2" />
                 Proceed to Next Step
